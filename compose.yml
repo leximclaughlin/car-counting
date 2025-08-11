@@ -1,0 +1,12 @@
+name: car_counting
+
+services:
+  app:
+    build: ./
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app.js:/app/app.js
+      - ./static:/app/static
+      - ./templates:/app/templates

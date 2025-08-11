@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Page</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="/js/login.js" defer></script> 
+</head>
+
+<body>
+  <div class="card">
+    <h1>Welcome!</h1>
+
+    <!-- Login Section -->
+    <section style="margin-bottom: 2rem;">
+      <h3>Login</h3>
+      <div class="mb-3">
+        <label for="username" class="form-label">Username</label><br>
+        <input type="text" class="form-control" id="username" required>
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Password</label><br>
+        <input type="password" class="form-control" id="password" required>
+      </div>
+      <button type="button" class="btn btn-primary" id="loginButton">Login</button>
+    </section>
+
+    <hr style="margin: 2rem 0;">
+
+    <!-- Register Section -->
+    <section>
+      <h3>Register</h3>
+      <div class="mb-3">
+        <label for="register-username" class="form-label">New Username</label><br>
+        <input type="text" class="form-control" id="register-username" required>
+      </div>
+      <div class="mb-3">
+        <label for="register-password" class="form-label">New Password</label><br>
+        <input type="password" class="form-control" id="register-password" required>
+      </div>
+      <button type="button" class="btn btn-secondary" id="registerButton">Register</button>
+    </section>
+
+    <p id="message"></p>
+  </div>
+</body>
+
+</html>

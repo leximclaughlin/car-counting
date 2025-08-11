@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Counting</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="/js/script.js" defer></script>
+</head>
+
+<body>
+  <div class="card">
+    <h1>Live Car Count</h1>
+    <img src="palisades.png" alt="The Fitzgerald of Palisades">
+    <h1>Spots in use:<span id="carCount"></span></h1>
+    <h1>Spots available:<span id="spotsAvailable"></span></h1>
+
+    <div class="edit-controls">
+      <input type="number" id="newCount" placeholder="Edit count" />
+      <button id="updateBtn">Update</button>
+    </div>
+
+    <button onclick="downloadPeakCSV()">Download Peak Traffic CSV</button>
+
+    <div class="monthly-report">
+      <select id="reportMonth"></select>
+      <button id="downloadMonthlyReport">Download Monthly Report</button>
+    </div>
+
+    <div class="logout-container">
+      <button id="logoutBtn" class="btn btn-logout">Logout</button>
+    </div>
+
+    <script>
+    async function loadAvailableReports() {
+      const res = await fetch('/reports/list');
+      const months = await res.json();
+
+      console.log('Months received:', months);
+      const select = document.getElementById('reportMonth');
+
+      if (months.length === 0) {
+        select.innerHTML = '<option disabled>No reports available</option>';
+        return;
+      }
+
+      select.innerHTML = '';
+      months.forEach(month => {
+      const MONTH_NAMES = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        const [year, monthNum] = month.split('-');
+        let index = parseInt(monthNum, 10); 
+
+        let month_displayed = MONTH_NAMES[index - 1];
+
+        const label = `${month_displayed} ${year}`;
+
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = label;
+        select.appendChild(option);
+      });
+    }
+
+    document.getElementById('downloadMonthlyReport').addEventListener('click', () => {
+      const month = document.getElementById('reportMonth').value;
+      if (month) window.location.href = `/reports/${month}`;
+    });
+
+    loadAvailableReports();
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/logout', {
+          method: 'POST',
+          credentials: 'include', // in case you're using cookies
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+          window.location.href = '/'; // redirect to login page
+        } else {
+          alert('Logout failed');
+        }
+      } catch (err) {
+        console.error('Logout error:', err);
+        alert('An error occurred while logging out.');
+      }
+    });
+
+    </script>
+
+  </div>
+</body>
+</html>
