@@ -17,6 +17,9 @@ const PORT = 3000;
 const API_KEY = 'MmFkNTU0ZmUtZTE2NS00NjJjLWJjZjYtNzM0YmE5MGMwODc4fDVkZTNkMGU5LWI2YzMtNDk3OS1iOTgzLWYxMTU1MTgzODg3ZQ=='; 
 const CAMERA_ID = 'eb1dcecf-76d9-471d-9d61-955a0bff6861'; 
 
+const TOTAL_SPOTS = 57;
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
 // Serve static files
 app.use(express.static('static'));
 
@@ -85,7 +88,9 @@ async function getLiveVehicleCount(token) {
   const totalIn = data.trend_in.reduce((sum, [start, end, count]) => sum + count, 0);
   const totalOut = data.trend_out.reduce((sum, [start, end, count]) => sum + count, 0);
 
-  return baseCount + (totalIn - totalOut);
+  // Clamp the live result so it never exceeds TOTAL_SPOTS or goes below 0
+  return clamp(baseCount + (totalIn - totalOut), 0, TOTAL_SPOTS);
+  // return baseCount + (totalIn - totalOut);
 }
   
   
@@ -252,17 +257,76 @@ function getPreviousMonthYear() {
 }
 
 // Helper to generate the previous month's CSV at midnight on the 1st of each month 
-scheduleJob('0 0 1 * *', async () => {
-  const token = await getToken();
-  const peakData = await findDailyPeakCounts(token);
-  const csv = convertToCSV(peakData);
+// scheduleJob('0 0 1 * *', async () => {
+//   const token = await getToken();
+//   const peakData = await findDailyPeakCounts(token);
+//   const csv = convertToCSV(peakData);
 
-  const monthLabel = getPreviousMonthYear(); // e.g. "2025-06"
-  const filePath = path.join(__dirname, 'reports', `${monthLabel}.csv`);
+//   const monthLabel = getPreviousMonthYear(); // e.g. "2025-06"
+//   const filePath = path.join(__dirname, 'reports', `${monthLabel}.csv`);
 
-  fs.writeFileSync(filePath, csv);
-  console.log(`Saved monthly report for ${monthLabel}`);
+//   fs.writeFileSync(filePath, csv);
+//   console.log(`Saved monthly report for ${monthLabel}`);
+// });
+
+// Helper: run on the 1st to generate the PREVIOUS month's report
+scheduleJob('5 0 1 * *', async () => {
+  try {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    if (prev.getMonth() + 1) {
+      await generateMonthlyReport(prev.getFullYear(), prev.getMonth() + 1);
+    }
+    console.log(`✅ Scheduled report generated for ${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`);
+  } catch (err) {
+    console.error('❌ Scheduled report failed:', err);
+  }
 });
+
+// Backfill from a chosen start month up to the last fully completed month
+async function backfillMissingReports({ startYear, startMonth }) {
+  const reportsDir = path.join(__dirname, 'static', 'reports');
+  if (!existsSync(reportsDir)) mkdirSync(reportsDir, { recursive: true });
+
+  // Build a set of already-generated report labels like "2025-06"
+  const existing = new Set(
+    fs.readdirSync(reportsDir)
+      .filter(f => f.endsWith('.csv'))
+      .map(f => f.replace('.csv', ''))
+  );
+
+  // Last completed month (today is August -> last completed is July)
+  const today = new Date();
+  const lastCompleted = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+
+  // Iterate months [start .. lastCompleted]
+  for (
+    let d = new Date(startYear, startMonth - 1, 1);
+    d <= lastCompleted;
+    d.setMonth(d.getMonth() + 1)
+  ) {
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const label = `${y}-${String(m).padStart(2, '0')}`;
+
+    if (!existing.has(label)) {
+      console.log(`ℹ️ Backfilling ${label}...`);
+      try {
+        await generateMonthlyReport(y, m);
+      } catch (e) {
+        console.error(`❌ Failed to backfill ${label}:`, e);
+      }
+    } else {
+      console.log(`✔️ Already have ${label}, skipping.`);
+    }
+  }
+}
+
+// Backfill starting June 2025 (adjust if you want earlier)
+backfillMissingReports({ startYear: 2025, startMonth: 6 })
+  .then(() => console.log('✅ Backfill complete'))
+  .catch(err => console.error('❌ Backfill error:', err));
+
 
 function convertToCSV(data) {
   const header = 'Date,Peak Count,Time of Peak';
@@ -367,27 +431,27 @@ app.post('/login', async (req, res) => {
 });
   
 // Manually generate the previous month's report at startup (for development/testing)
-(async () => {
-  try {
-    const token = await getToken();
-    const peakData = await findDailyPeakCounts(token);
-    const csv = convertToCSV(peakData);
+// (async () => {
+//   try {
+//     const token = await getToken();
+//     const peakData = await findDailyPeakCounts(token);
+//     const csv = convertToCSV(peakData);
 
-    const now = new Date();
-    now.setMonth(now.getMonth() - 1); // previous month
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const label = `${year}-${month}`; // e.g. "2025-06"
+//     const now = new Date();
+//     now.setMonth(now.getMonth() - 1); // previous month
+//     const year = now.getFullYear();
+//     const month = String(now.getMonth() + 1).padStart(2, '0');
+//     const label = `${year}-${month}`; // e.g. "2025-06"
 
-    const filePath = path.join(__dirname, 'static', 'reports', `${label}.csv`);
-    fs.writeFileSync(filePath, csv);
-    console.log(`✅ Manually generated monthly report for ${label}`);
-  } catch (err) {
-    console.error('❌ Failed to generate manual report on startup:', err);
-  }
-})();
+//     const filePath = path.join(__dirname, 'static', 'reports', `${label}.csv`);
+//     fs.writeFileSync(filePath, csv);
+//     console.log(`✅ Manually generated monthly report for ${label}`);
+//   } catch (err) {
+//     console.error('❌ Failed to generate manual report on startup:', err);
+//   }
+// })();
 
-generateMonthlyReport(2025, 6); // Run before app.listen()
+generateMonthlyReport(2025, 7); // Run before app.listen()
 
 
 // Start server

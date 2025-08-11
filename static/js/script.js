@@ -6,8 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const TOTAL_SPOTS = 57;
    
     updateBtn.addEventListener("click", async () => {
-        const newValue = parseInt(newCountInput.value, 10);
-        if (!isNaN(newValue) && newValue >= 0) {
+        const raw = parseInt(newCountInput.value, 10);
+        if (!isNaN(raw) && raw >= 0) {
+          const newValue = clamp(raw, 0, TOTAL_SPOTS);   // ⬅️ clamp here
+
           try {
             const res = await fetch('/car-count', {
               method: 'POST',
@@ -23,6 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
       
             carCount.textContent = newValue;
             spotsAvailable.textContent = Math.max(TOTAL_SPOTS - newValue, 0);
+
+            // Optional gentle nudge if they tried to exceed the max
+            if (raw > TOTAL_SPOTS) {
+              alert(`Max is ${TOTAL_SPOTS}. I've set it to ${TOTAL_SPOTS}.`);
+            }
             
             newCountInput.value = "";
             alert("Car count updated and saved!");
