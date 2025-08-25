@@ -17,7 +17,7 @@ const PORT = 3000;
 const API_KEY = 'MmFkNTU0ZmUtZTE2NS00NjJjLWJjZjYtNzM0YmE5MGMwODc4fDVkZTNkMGU5LWI2YzMtNDk3OS1iOTgzLWYxMTU1MTgzODg3ZQ=='; 
 const CAMERA_ID = 'eb1dcecf-76d9-471d-9d61-955a0bff6861'; 
 
-const TOTAL_SPOTS = 57;
+const TOTAL_SPOTS = 55;
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
 // Serve static files
@@ -64,17 +64,17 @@ async function getToken() {
   return response.data.token;
 }
 
-// July 16, 2025 at 6:00PM EDT (22:00 UTC)
-const START_TIMESTAMP = Date.UTC(2025, 6, 16, 22, 0, 0) / 1000; // 1752703200
+// August 18, 2025 at 3:00PM EDT (19:00 UTC)
+const START_TIMESTAMP = 1755558000
 
 async function getLiveVehicleCount(token) {
   const now = Math.floor(Date.now() / 1000);  
   const manualBaseline = loadManualBaseline(); // always read fresh
 
   const baselineTimestamp = manualBaseline?.timestamp || START_TIMESTAMP;
-  const baseCount = manualBaseline?.count || 16;
+  const baseCount = manualBaseline?.count || 20; // actual count of 20 cars on start date
 
-  const url = `https://api.verkada.com/cameras/v1/analytics/occupancy_trends?camera_id=${CAMERA_ID}&start_time=${baselineTimestamp}&end_time=${now}&interval=1_hour&type=vehicle&preset_id=e3bf81d8-a1a8-4822-8bfa-1e56bc38af65`;
+  const url = `https://api.verkada.com/cameras/v1/analytics/occupancy_trends?camera_id=${CAMERA_ID}&start_time=${baselineTimestamp}&interval=1_hour&type=vehicle&preset_id=e3bf81d8-a1a8-4822-8bfa-1e56bc38af65`;
 
   const response = await fetch(url, {
     headers: {
@@ -88,7 +88,7 @@ async function getLiveVehicleCount(token) {
   const totalIn = data.trend_in.reduce((sum, [start, end, count]) => sum + count, 0);
   const totalOut = data.trend_out.reduce((sum, [start, end, count]) => sum + count, 0);
 
-  // Clamp the live result so it never exceeds TOTAL_SPOTS or goes below 0
+  // Clamp live result so it never exceeds TOTAL_SPOTS or goes below 0
   return clamp(baseCount + (totalIn - totalOut), 0, TOTAL_SPOTS);
   // return baseCount + (totalIn - totalOut);
 }
@@ -256,19 +256,6 @@ function getPreviousMonthYear() {
   return `${year}-${month}`; // e.g. "2025-06"
 }
 
-// Helper to generate the previous month's CSV at midnight on the 1st of each month 
-// scheduleJob('0 0 1 * *', async () => {
-//   const token = await getToken();
-//   const peakData = await findDailyPeakCounts(token);
-//   const csv = convertToCSV(peakData);
-
-//   const monthLabel = getPreviousMonthYear(); // e.g. "2025-06"
-//   const filePath = path.join(__dirname, 'reports', `${monthLabel}.csv`);
-
-//   fs.writeFileSync(filePath, csv);
-//   console.log(`Saved monthly report for ${monthLabel}`);
-// });
-
 // Helper: run on the 1st to generate the PREVIOUS month's report
 scheduleJob('5 0 1 * *', async () => {
   try {
@@ -322,10 +309,10 @@ async function backfillMissingReports({ startYear, startMonth }) {
   }
 }
 
-// Backfill starting June 2025 (adjust if you want earlier)
+// Backfill starting June 2025 
 backfillMissingReports({ startYear: 2025, startMonth: 6 })
-  .then(() => console.log('✅ Backfill complete'))
-  .catch(err => console.error('❌ Backfill error:', err));
+  .then(() => console.log('Backfill complete'))
+  .catch(err => console.error('Backfill error:', err));
 
 
 function convertToCSV(data) {
@@ -365,7 +352,7 @@ function loginSuccess(userFound, userIdTemp, res) {
   };
   const payload = {
     sub: userIdTemp,  // subject, usually the user ID
-    iat: Math.floor(Date.now() / 1000), // issued at timestamp
+    iat: Math.floor(Date.now() / 1000), 
   };
   const token = createJWT(header, payload);
 
@@ -429,30 +416,9 @@ app.post('/login', async (req, res) => {
   res.cookie('username', username, { httpOnly: true });
   res.json({ success: true, message: 'Login successful', redirectUrl: '/index' });
 });
-  
-// Manually generate the previous month's report at startup (for development/testing)
-// (async () => {
-//   try {
-//     const token = await getToken();
-//     const peakData = await findDailyPeakCounts(token);
-//     const csv = convertToCSV(peakData);
-
-//     const now = new Date();
-//     now.setMonth(now.getMonth() - 1); // previous month
-//     const year = now.getFullYear();
-//     const month = String(now.getMonth() + 1).padStart(2, '0');
-//     const label = `${year}-${month}`; // e.g. "2025-06"
-
-//     const filePath = path.join(__dirname, 'static', 'reports', `${label}.csv`);
-//     fs.writeFileSync(filePath, csv);
-//     console.log(`✅ Manually generated monthly report for ${label}`);
-//   } catch (err) {
-//     console.error('❌ Failed to generate manual report on startup:', err);
-//   }
-// })();
 
 generateMonthlyReport(2025, 7); // Run before app.listen()
-
+console.log('manually generated july!!');
 
 // Start server
 app.listen(PORT, () => {

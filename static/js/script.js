@@ -3,12 +3,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const spotsAvailable = document.getElementById("spotsAvailable");
     const newCountInput = document.getElementById("newCount");
     const updateBtn = document.getElementById("updateBtn");
-    const TOTAL_SPOTS = 57;
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+    const TOTAL_SPOTS = 55;
    
     updateBtn.addEventListener("click", async () => {
         const raw = parseInt(newCountInput.value, 10);
         if (!isNaN(raw) && raw >= 0) {
-          const newValue = clamp(raw, 0, TOTAL_SPOTS);   // ⬅️ clamp here
+          const newValue = clamp(raw, 0, TOTAL_SPOTS);
 
           try {
             const res = await fetch('/car-count', {
@@ -26,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
             carCount.textContent = newValue;
             spotsAvailable.textContent = Math.max(TOTAL_SPOTS - newValue, 0);
 
-            // Optional gentle nudge if they tried to exceed the max
             if (raw > TOTAL_SPOTS) {
               alert(`Max is ${TOTAL_SPOTS}. I've set it to ${TOTAL_SPOTS}.`);
             }
