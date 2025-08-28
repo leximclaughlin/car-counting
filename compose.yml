@@ -10,3 +10,5 @@ services:
       - ./app.js:/app/app.js
       - ./static:/app/static
       - ./templates:/app/templates
+      - ./src/data:/app/src/data
+      
