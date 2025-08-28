@@ -389,6 +389,10 @@ function writeUsers(users) {
 
 // Register route
 app.post('/register', async (req, res) => {
+  // Added validation - must have at least one character each
+  if (!username || !password || username.length < 1 || password.length < 1) {
+    return res.status(400).json({ message: 'Username and password must not be empty.' });
+  }
   const { username, password } = req.body;
   const users = readUsers();
 
