@@ -178,7 +178,14 @@ async function findDailyPeakCounts(token, year, month) {
   const startTime = getFirstOfMonthTimestamp(year, month);
   const endTime = getFirstOfMonthTimestamp(year, month + 1); // next month start
 
-  const url = `https://api.verkada.com/cameras/v1/analytics/dashboard_occupancy_trends?dashboard_id=163fd2d5-f996-42ce-b0f9-85065e9ad7f4&start_time=${startTime}&end_time=${endTime}&interval=1_hour`;
+  const now = Math.floor(Date.now() / 1000);  
+  const manualBaseline = loadManualBaseline(); // always read fresh
+
+  const baselineTimestamp = manualBaseline?.timestamp || START_TIMESTAMP;
+  const baseCount = manualBaseline?.count || 20; // actual count of 20 cars on start date
+
+ // const url = `https://api.verkada.com/cameras/v1/analytics/dashboard_occupancy_trends?dashboard_id=163fd2d5-f996-42ce-b0f9-85065e9ad7f4&start_time=${startTime}&end_time=${endTime}&interval=1_hour`;
+  const url = `https://api.verkada.com/cameras/v1/analytics/occupancy_trends?camera_id=${CAMERA_ID}&start_time=${baselineTimestamp}&interval=1_hour&type=vehicle&preset_id=e3bf81d8-a1a8-4822-8bfa-1e56bc38af65`;
 
   const response = await fetch(url, {
     headers: {
@@ -188,7 +195,11 @@ async function findDailyPeakCounts(token, year, month) {
   });
 
   const data = await response.json();
-  if (!data.trend_in || !data.trend_out) return [];
+  console.log('Verkada API response for', year, month, ':', JSON.stringify(data, null, 2));
+  if (!data.trend_in || !data.trend_out) {
+    console.warn('No trend_in or trend_out data for', year, month);
+    return [];
+  }
 
   const hourlyChanges = new Map();
   for (const [start, , count] of data.trend_in) {
@@ -198,7 +209,7 @@ async function findDailyPeakCounts(token, year, month) {
     hourlyChanges.set(start, (hourlyChanges.get(start) || 0) - count);
   }
 
-  let runningTotal = 0;
+  let runningTotal = baseCount;
   const dailyMaxMap = {};
 
   const sortedTimestamps = [...hourlyChanges.keys()].sort((a, b) => a - b);
@@ -228,7 +239,7 @@ async function generateMonthlyReport(year, month) {
   const label = `${year}-${String(month).padStart(2, '0')}`;
   const filePath = path.join(__dirname, 'static', 'reports', `${label}.csv`);
   fs.writeFileSync(filePath, csv);
-  console.log(`✅ Report generated for ${label}`);
+  console.log(`Report generated for ${label}`);
 }
 
 
@@ -264,7 +275,7 @@ scheduleJob('5 0 1 * *', async () => {
     if (prev.getMonth() + 1) {
       await generateMonthlyReport(prev.getFullYear(), prev.getMonth() + 1);
     }
-    console.log(`✅ Scheduled report generated for ${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`);
+    console.log(`Scheduled report generated for ${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`);
   } catch (err) {
     console.error('❌ Scheduled report failed:', err);
   }
@@ -297,14 +308,14 @@ async function backfillMissingReports({ startYear, startMonth }) {
     const label = `${y}-${String(m).padStart(2, '0')}`;
 
     if (!existing.has(label)) {
-      console.log(`ℹ️ Backfilling ${label}...`);
+      console.log(` Backfilling ${label}...`);
       try {
         await generateMonthlyReport(y, m);
       } catch (e) {
         console.error(`❌ Failed to backfill ${label}:`, e);
       }
     } else {
-      console.log(`✔️ Already have ${label}, skipping.`);
+      console.log(`Already have ${label}, skipping.`);
     }
   }
 }
@@ -343,29 +354,6 @@ app.get('/reports/list', (req, res) => {
   res.json(months.sort().reverse()); // Latest first
 }); 
 
-// Helper function for successful login
-function loginSuccess(userFound, userIdTemp, res) {
-  // Create JWT token
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT',
-  };
-  const payload = {
-    sub: userIdTemp,  // subject, usually the user ID
-    iat: Math.floor(Date.now() / 1000), 
-  };
-  const token = createJWT(header, payload);
-
-  // Set cookies with JWT token
-  res.cookie('token', token, { httpOnly: true, maxAge: 3600000, sameSite: 'none', secure: true });
-
-  return res.json({
-    success: true,
-    message: 'Login successful',
-    redirectUrl: '/index',
-  });
-}
-
 // Route to serve the index page after successful login
 app.get('/index', (req, res) => {
   res.sendFile(path.join(__dirname, 'templates', 'index.html'));
@@ -384,7 +372,6 @@ function readUsers() {
 
 function writeUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  console.log('written')
 }
 
 // Register route
@@ -420,9 +407,6 @@ app.post('/login', async (req, res) => {
   res.cookie('username', username, { httpOnly: true });
   res.json({ success: true, message: 'Login successful', redirectUrl: '/index' });
 });
-
-generateMonthlyReport(2025, 7); // Run before app.listen()
-console.log('manually generated july!!');
 
 // Start server
 app.listen(PORT, () => {
